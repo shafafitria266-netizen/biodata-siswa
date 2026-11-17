@@ -6,16 +6,20 @@
 <title>Biodata Siswa</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
-  :root{--bg:#0b1220;--card:#162033;--line:#26324a;--text:#f1f5f9;--muted:#8b98b0;--accent:#6366f1}
+  :root{--bg:#0b1220;--card:#162033;--line:#26324a;--text:#f1f5f9;--muted:#8b98b0;--accent:#6366f1;--bad:#fca5a5}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:20px}
   .wrap{max-width:900px;margin:0 auto}
   header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
   h1{margin:0;font-size:2rem}
   .sub{color:var(--muted);margin:6px 0 18px}
+  .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .who{color:var(--muted);font-size:.85rem}
   button,input,select{font:inherit;color:var(--text)}
   .btn{background:var(--accent);border:0;border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line)}
+  .btn.danger{background:transparent;border:1px solid #7f2a36;color:var(--bad);padding:7px 12px;font-size:.85rem}
+  .btn:disabled{opacity:.6;cursor:wait}
   input,select{width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
   .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   .filters input{flex:1 1 220px}
@@ -30,17 +34,18 @@
   .nis{text-align:center;color:var(--muted);margin-bottom:12px}
   .row{display:flex;justify-content:space-between;padding:9px 20px;border-top:1px solid var(--line)}
   .row span{color:var(--muted)} .row b{font-weight:700}
+  .hapus{text-align:center;padding-top:12px;border-top:1px solid var(--line)}
   .empty{color:var(--muted);text-align:center;padding:40px 0;grid-column:1/-1}
-  /* modal */
+  .hidden{display:none!important}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
   .overlay.open{display:flex}
   .modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;width:100%;max-width:420px;max-height:92vh;overflow:auto}
   .modal h2{margin:0 0 14px}
   label{display:block;font-size:.9rem;color:var(--muted);margin:12px 0 6px}
-  .preview{width:88px;height:88px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);margin:0 auto 4px;display:grid;place-items:center;color:var(--muted);font-size:.75rem;overflow:hidden;text-align:center}
+  .preview{width:88px;height:88px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);margin:0 auto 4px;display:grid;place-items:center;color:var(--muted);font-size:.75rem;overflow:hidden}
   .preview img{width:100%;height:100%;object-fit:cover}
   .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
-  .msg{margin-top:12px;font-size:.9rem;color:#fca5a5;min-height:1.2em}
+  .msg{margin-top:12px;font-size:.9rem;color:var(--bad);min-height:1.2em}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
@@ -51,7 +56,12 @@
       <h1>Biodata Siswa</h1>
       <p class="sub">Cari siswa berdasarkan nama atau NIS.</p>
     </div>
-    <button class="btn" id="btnTambah">+ Tambah siswa</button>
+    <div class="tools">
+      <span class="who hidden" id="who"></span>
+      <button class="btn hidden" id="btnTambah">+ Tambah siswa</button>
+      <button class="btn ghost hidden" id="btnKeluar">Keluar</button>
+      <button class="btn ghost" id="btnMasuk">Masuk guru</button>
+    </div>
   </header>
 
   <div class="filters">
@@ -62,10 +72,26 @@
   <div class="grid" id="list"></div>
 </div>
 
-<!-- Form tambah siswa -->
-<div class="overlay" id="overlay">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judul">
-    <h2 id="judul">Tambah siswa</h2>
+<!-- Login guru -->
+<div class="overlay" id="ovLogin">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jLogin">
+    <h2 id="jLogin">Masuk guru</h2>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="guru@sekolah.sch.id">
+    <label for="sandi">Password</label>
+    <input id="sandi" type="password" autocomplete="current-password">
+    <div class="msg" id="msgLogin"></div>
+    <div class="actions">
+      <button class="btn ghost" id="btnBatalLogin" type="button">Batal</button>
+      <button class="btn" id="btnLogin" type="button">Masuk</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tambah siswa -->
+<div class="overlay" id="ovTambah">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jTambah">
+    <h2 id="jTambah">Tambah siswa</h2>
     <div class="preview" id="preview">Foto</div>
     <label for="foto">Foto profil</label>
     <input type="file" id="foto" accept="image/*">
@@ -80,10 +106,7 @@
     <input id="kelasInput" placeholder="Contoh: X-A">
 
     <label for="jk">Jenis kelamin</label>
-    <select id="jk">
-      <option>Laki-laki</option>
-      <option>Perempuan</option>
-    </select>
+    <select id="jk"><option>Laki-laki</option><option>Perempuan</option></select>
 
     <div class="msg" id="msg"></div>
     <div class="actions">
@@ -99,23 +122,25 @@
   const SUPABASE_KEY = "sb_publishable_EGe3bjpUmPze8Avhrz00XQ_xA7f6ZWp";
   // ========================================================================
 
+  const $ = id => document.getElementById(id);
+
+  if (typeof supabase === "undefined" || SUPABASE_URL.includes("XXXX") || SUPABASE_KEY.startsWith("ISI_")){
+    $("list").innerHTML = '<div class="empty">Supabase belum diatur. Isi SUPABASE_URL dan SUPABASE_KEY di index.html.</div>';
+    throw new Error("Supabase belum diatur");
+  }
+
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const BUCKET = "foto-siswa";
   const WARNA = ["#be2a3c","#c026b0","#2563eb","#0d9488","#d97706","#7c3aed","#16a34a"];
 
   let semuaSiswa = [];
-  const $ = id => document.getElementById(id);
+  let guru = null; // null = pengunjung, objek = guru yang login
 
-  function inisial(nama){
-    const p = nama.trim().split(/\s+/);
-    return ((p[0]?.[0] || "") + (p[1]?.[0] || "")).toUpperCase();
-  }
-  function warna(nama){
-    let h = 0; for (const c of nama) h = (h * 31 + c.charCodeAt(0)) % 997;
-    return WARNA[h % WARNA.length];
-  }
-  function esc(s){ const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+  const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+  const inisial = n => { const p = n.trim().split(/\s+/); return ((p[0]?.[0]||"") + (p[1]?.[0]||"")).toUpperCase(); };
+  const warna = n => { let h = 0; for (const c of n) h = (h*31 + c.charCodeAt(0)) % 997; return WARNA[h % WARNA.length]; };
 
+  // ----- data siswa -----
   async function muat(){
     const { data, error } = await db.from("siswa").select("*").order("nama");
     if (error){ $("list").innerHTML = `<div class="empty">Gagal memuat data: ${esc(error.message)}</div>`; return; }
@@ -126,9 +151,8 @@
 
   function isiKelas(){
     const dipilih = $("kelas").value;
-    const daftar = [...new Set(semuaSiswa.map(s => s.kelas))].sort();
-    $("kelas").innerHTML = '<option value="">Semua kelas</option>' +
-      daftar.map(k => `<option>${esc(k)}</option>`).join("");
+    const daftar = [...new Set(semuaSiswa.map(s => s.kelas).filter(Boolean))].sort();
+    $("kelas").innerHTML = '<option value="">Semua kelas</option>' + daftar.map(k => `<option>${esc(k)}</option>`).join("");
     $("kelas").value = dipilih;
   }
 
@@ -137,16 +161,17 @@
     const k = $("kelas").value;
     const hasil = semuaSiswa.filter(s =>
       (!k || s.kelas === k) &&
-      (!q || s.nama.toLowerCase().includes(q) || String(s.nis).includes(q)));
+      (!q || (s.nama||"").toLowerCase().includes(q) || String(s.nis||"").includes(q)));
 
     $("count").textContent = `${hasil.length} dari ${semuaSiswa.length} siswa`;
     if (!hasil.length){ $("list").innerHTML = '<div class="empty">Tidak ada siswa yang cocok.</div>'; return; }
 
     $("list").innerHTML = hasil.map(s => {
-      const w = warna(s.nama);
+      const w = warna(s.nama || "?");
       const avatar = s.foto_url
         ? `<img src="${esc(s.foto_url)}" alt="Foto ${esc(s.nama)}">`
-        : `<span style="color:${w}">${esc(inisial(s.nama))}</span>`;
+        : `<span style="color:${w}">${esc(inisial(s.nama || "?"))}</span>`;
+      const hapus = guru ? `<div class="hapus"><button class="btn danger" data-hapus="${s.id}">Hapus siswa</button></div>` : "";
       return `
         <article class="card">
           <div class="banner" style="background:${w}"></div>
@@ -155,14 +180,47 @@
           <div class="nis">NIS ${esc(s.nis)}</div>
           <div class="row"><span>Kelas</span><b>${esc(s.kelas)}</b></div>
           <div class="row"><span>Jenis kelamin</span><b>${esc(s.jenis_kelamin)}</b></div>
+          ${hapus}
         </article>`;
     }).join("");
   }
 
-  // ----- modal tambah siswa -----
-  function bukaModal(){ $("overlay").classList.add("open"); $("nama").focus(); }
-  function tutupModal(){
-    $("overlay").classList.remove("open");
+  // ----- login guru -----
+  function aturTombol(){
+    const masuk = !!guru;
+    $("btnMasuk").classList.toggle("hidden", masuk);
+    $("btnTambah").classList.toggle("hidden", !masuk);
+    $("btnKeluar").classList.toggle("hidden", !masuk);
+    $("who").classList.toggle("hidden", !masuk);
+    $("who").textContent = masuk ? "Guru: " + (guru.email || "") : "";
+    tampil();
+  }
+
+  async function login(){
+    const email = $("email").value.trim();
+    const password = $("sandi").value;
+    if (!email || !password){ $("msgLogin").textContent = "Email dan password wajib diisi."; return; }
+    $("btnLogin").disabled = true; $("btnLogin").textContent = "Masuk...";
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    $("btnLogin").disabled = false; $("btnLogin").textContent = "Masuk";
+    if (error){
+      $("msgLogin").textContent = error.message === "Invalid login credentials"
+        ? "Email atau password salah." : "Gagal masuk: " + error.message;
+      return;
+    }
+    $("ovLogin").classList.remove("open");
+    $("email").value = ""; $("sandi").value = ""; $("msgLogin").textContent = "";
+  }
+
+  db.auth.onAuthStateChange((_e, session) => {
+    guru = session?.user || null;
+    aturTombol();
+  });
+
+  // ----- tambah siswa -----
+  function bukaTambah(){ $("ovTambah").classList.add("open"); $("nama").focus(); }
+  function tutupTambah(){
+    $("ovTambah").classList.remove("open");
     ["foto","nama","nis","kelasInput"].forEach(id => $(id).value = "");
     $("jk").selectedIndex = 0;
     $("preview").innerHTML = "Foto";
@@ -171,8 +229,7 @@
 
   $("foto").addEventListener("change", e => {
     const f = e.target.files[0];
-    if (!f) return;
-    $("preview").innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Pratinjau foto">`;
+    if (f) $("preview").innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Pratinjau foto">`;
   });
 
   async function simpan(){
@@ -183,41 +240,57 @@
     const file = $("foto").files[0];
 
     if (!nama || !nis || !kelas){ $("msg").textContent = "Nama, NIS, dan kelas wajib diisi."; return; }
-    if (file && file.size > 2 * 1024 * 1024){ $("msg").textContent = "Ukuran foto maksimal 2 MB."; return; }
+    if (semuaSiswa.some(s => String(s.nis) === nis)){ $("msg").textContent = "NIS sudah terdaftar. Gunakan NIS lain."; return; }
+    if (file && file.size > 2*1024*1024){ $("msg").textContent = "Ukuran foto maksimal 2 MB."; return; }
 
-    $("btnSimpan").disabled = true;
-    $("btnSimpan").textContent = "Menyimpan...";
+    $("btnSimpan").disabled = true; $("btnSimpan").textContent = "Menyimpan...";
     $("msg").textContent = "";
-
     try {
       let foto_url = null;
       if (file){
-        const ext = file.name.split(".").pop().toLowerCase();
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${nis}-${Date.now()}.${ext}`;
         const { error: upErr } = await db.storage.from(BUCKET).upload(path, file, { contentType: file.type });
         if (upErr) throw upErr;
         foto_url = db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
       }
-
       const { error } = await db.from("siswa").insert({ nama, nis, kelas, jenis_kelamin: jk, foto_url });
       if (error) throw error;
-
-      tutupModal();
+      tutupTambah();
       await muat();
     } catch (err){
-      $("msg").textContent = err.code === "23505"
-        ? "NIS sudah terdaftar. Gunakan NIS lain."
-        : "Gagal menyimpan: " + err.message;
+      $("msg").textContent = "Gagal menyimpan: " + err.message;
     } finally {
-      $("btnSimpan").disabled = false;
-      $("btnSimpan").textContent = "Simpan siswa";
+      $("btnSimpan").disabled = false; $("btnSimpan").textContent = "Simpan siswa";
     }
   }
 
-  $("btnTambah").onclick = bukaModal;
-  $("btnBatal").onclick = tutupModal;
+  // ----- hapus siswa -----
+  $("list").addEventListener("click", async e => {
+    const id = e.target.dataset?.hapus;
+    if (!id) return;
+    const s = semuaSiswa.find(x => String(x.id) === id);
+    if (!s || !confirm(`Hapus ${s.nama}?`)) return;
+    const { error } = await db.from("siswa").delete().eq("id", s.id);
+    if (error){ alert("Gagal menghapus: " + error.message); return; }
+    if (s.foto_url){
+      const path = decodeURIComponent(s.foto_url.split(`/${BUCKET}/`)[1] || "");
+      if (path) await db.storage.from(BUCKET).remove([path]);
+    }
+    muat();
+  });
+
+  // ----- event -----
+  $("btnMasuk").onclick = () => { $("ovLogin").classList.add("open"); $("email").focus(); };
+  $("btnBatalLogin").onclick = () => $("ovLogin").classList.remove("open");
+  $("btnLogin").onclick = login;
+  $("sandi").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  $("btnKeluar").onclick = () => db.auth.signOut();
+  $("btnTambah").onclick = bukaTambah;
+  $("btnBatal").onclick = tutupTambah;
   $("btnSimpan").onclick = simpan;
-  $("overlay").addEventListener("click", e => { if (e.target === $("overlay")) tutupModal(); });
+  $("ovLogin").addEventListener("click", e => { if (e.target === $("ovLogin")) $("ovLogin").classList.remove("open"); });
+  $("ovTambah").addEventListener("click", e => { if (e.target === $("ovTambah")) tutupTambah(); });
   $("cari").addEventListener("input", tampil);
   $("kelas").addEventListener("change", tampil);
 
