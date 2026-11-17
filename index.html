@@ -34,7 +34,8 @@
   .nis{text-align:center;color:var(--muted);margin-bottom:12px}
   .row{display:flex;justify-content:space-between;padding:9px 20px;border-top:1px solid var(--line)}
   .row span{color:var(--muted)} .row b{font-weight:700}
-  .hapus{text-align:center;padding-top:12px;border-top:1px solid var(--line)}
+  .hapus{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
+  .btn.kecil{background:var(--accent);padding:7px 12px;font-size:.85rem}
   .empty{color:var(--muted);text-align:center;padding:40px 0;grid-column:1/-1}
   .hidden{display:none!important}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
@@ -116,6 +117,8 @@
   </div>
 </div>
 
+<input type="file" id="fotoEdit" accept="image/*" class="hidden">
+
 <script>
   // ====== GANTI DENGAN MILIK KAMU (Supabase > Project Settings > API) ======
   const SUPABASE_URL = "https://gkgrbsnejfmzjgzgxsww.supabase.co";
@@ -171,7 +174,7 @@
       const avatar = s.foto_url
         ? `<img src="${esc(s.foto_url)}" alt="Foto ${esc(s.nama)}">`
         : `<span style="color:${w}">${esc(inisial(s.nama || "?"))}</span>`;
-      const hapus = guru ? `<div class="hapus"><button class="btn danger" data-hapus="${s.id}">Hapus siswa</button></div>` : "";
+      const hapus = guru ? `<div class="hapus"><button class="btn kecil" data-foto="${s.id}">${s.foto_url ? "Ubah foto" : "Tambah foto"}</button><button class="btn danger" data-hapus="${s.id}">Hapus siswa</button></div>` : "";
       return `
         <article class="card">
           <div class="banner" style="background:${w}"></div>
@@ -264,6 +267,42 @@
       $("btnSimpan").disabled = false; $("btnSimpan").textContent = "Simpan siswa";
     }
   }
+
+  // ----- edit foto profil -----
+  let editId = null;
+  $("list").addEventListener("click", e => {
+    const id = e.target.dataset?.foto;
+    if (!id) return;
+    editId = id;
+    $("fotoEdit").value = "";
+    $("fotoEdit").click();
+  });
+
+  $("fotoEdit").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    const s = semuaSiswa.find(x => String(x.id) === String(editId));
+    if (!file || !s) return;
+    if (file.size > 2*1024*1024){ alert("Ukuran foto maksimal 2 MB."); return; }
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${s.nis}-${Date.now()}.${ext}`;
+      const { error: upErr } = await db.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+      if (upErr) throw upErr;
+      const foto_url = db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+
+      const { data, error } = await db.from("siswa").update({ foto_url }).eq("id", s.id).select();
+      if (error) throw error;
+      if (!data || !data.length) throw new Error("Tidak diizinkan. Pastikan kamu login sebagai guru.");
+
+      if (s.foto_url){
+        const lama = decodeURIComponent(s.foto_url.split(`/${BUCKET}/`)[1] || "");
+        if (lama) await db.storage.from(BUCKET).remove([lama]);
+      }
+      await muat();
+    } catch (err){
+      alert("Gagal mengubah foto: " + err.message);
+    }
+  });
 
   // ----- hapus siswa -----
   $("list").addEventListener("click", async e => {
